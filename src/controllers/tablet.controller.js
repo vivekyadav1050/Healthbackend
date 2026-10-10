@@ -4,10 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const registerTablet = asyncHandler(async (req, res) => {
   const deviceKey = String(req.body.deviceKey || "").trim();
-<<<<<<< HEAD
-=======
 
->>>>>>> 80cdcdfd3adbb9c6e5688f005fb7fe2f989f77ba
   if (deviceKey.length < 16 || deviceKey.length > 200) {
     return res.status(400).json({ success: false, message: "deviceKey must be 16-200 characters" });
   }
@@ -30,11 +27,6 @@ export const registerTablet = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: "Tablet registered", tabletId: tablet.tabletId });
 });
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 80cdcdfd3adbb9c6e5688f005fb7fe2f989f77ba
 export const getMyTablet = asyncHandler(async (req, res) => {
   const tablet = await Tablet.findOne({ user: req.user.id });
   if (!tablet) return res.status(404).json({ success: false, message: "Tablet is not registered" });
