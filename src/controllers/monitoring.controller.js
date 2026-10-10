@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const readingFields = ["recordId", "timestamp", "spo2", "pulseRate", "perfusionIndex", "batteryLevel", "probeStatus"];
+
 const numericRules = {
   spo2: [0, 100], pulseRate: [0, 300], perfusionIndex: [0, 100], batteryLevel: [0, 100]
 };
@@ -87,6 +88,8 @@ export const latestReading = asyncHandler(async (req, res) => {
   res.json({ success: true, patientId: req.params.patientId, latestReading: reading || null });
 });
 
+
+
 export const recentHistory = asyncHandler(async (req, res) => {
   if (req.query.range !== "1h") return res.status(400).json({ success: false, message: "Only range=1h is supported" });
   const access = await authorizePatientRead(req, req.params.patientId);
@@ -125,13 +128,32 @@ export const activePatients = asyncHandler(async (req, res) => {
   const users = await User.find({ _id: { $in: tabletUserIds } }).select("username");
   const usernames = new Map(users.map(u => [String(u._id), u.username]));
   const patientIds = visible.map(p => p.patientId);
-  const latestRows = await MonitoringReading.aggregate([
-    { $match: { patientId: { $in: patientIds } } },
-    { $sort: { timestamp: -1 } },
-    { $group: { _id: "$patientId", reading: { $first: "$$ROOT" } } }
-  ]);
-  const latestMap = new Map(latestRows.map(r => [r._id, r.reading]));
-  const timeout = Number(process.env.DEVICE_ONLINE_TIMEOUT_SECONDS || 120);
+  
+const latestRows = await MonitoringReading.aggregate([
+  {
+    $match: {
+      patientId: { $in: patientIds }
+    }
+  },
+  {
+    $sort: {
+      timestamp: -1,
+      _id: -1
+    }
+  },
+  {
+    $group: {
+      _id: "$patientId",
+      reading: { $first: "$$ROOT" }
+    }
+  }
+]);
+
+const latestMap = new Map(
+  latestRows.map(row => [String(row._id), row.reading])
+);
+
+const timeout = Number(process.env.DEVICE_ONLINE_TIMEOUT_SECONDS || 120);
   const now = Date.now();
 
   const result = visible.map(p => {
