@@ -29,6 +29,7 @@ function validateReading(item) {
 
 async function authorizePatientRead(req, patientId) {
   const patient = await Patient.findOne({ patientId });
+
   if (!patient) return { error: { status: 404, message: "Patient not found" } };
   if (req.user.role === "tablet") {
     const tablet = await Tablet.findOne({ _id: patient.tablet, user: req.user.id });
@@ -99,24 +100,83 @@ export const recentHistory = asyncHandler(async (req, res) => {
   res.json({ success: true, patientId: req.params.patientId, range: "1h", count: readings.length, readings });
 });
 
+
 export const patientHistory = asyncHandler(async (req, res) => {
   const access = await authorizePatientRead(req, req.params.patientId);
-  if (access.error) return res.status(access.error.status).json({ success: false, message: access.error.message });
+
+  if (access.error) {
+    return res.status(access.error.status).json({
+      success: false,
+      message: access.error.message
+    });
+  }
+
+  const patient = access.patient;
+
   const page = Number.parseInt(req.query.page ?? "1", 10);
   const limit = Number.parseInt(req.query.limit ?? "100", 10);
-  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 500) {
-    return res.status(400).json({ success: false, message: "page must be >= 1 and limit must be 1-500" });
+
+  if (
+    !Number.isInteger(page) ||
+    page < 1 ||
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 500
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "page must be >= 1 and limit must be 1-500"
+    });
   }
-  const filter = { patientId: req.params.patientId };
+
+  const filter = {
+    patientId: req.params.patientId
+  };
+
   const [totalRecords, readings] = await Promise.all([
     MonitoringReading.countDocuments(filter),
-    MonitoringReading.find(filter).sort({ timestamp: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
+    MonitoringReading.find(filter)
+      .sort({ timestamp: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean()
   ]);
+
+  // Fetch the associated tablet details
+  const tablet = await Tablet.findById(patient.tablet)
+    .select("tabletId isActive lastSeenAt")
+    .lean();
+
   res.json({
-    success: true, patientId: req.params.patientId, page, limit, totalRecords,
-    totalPages: Math.ceil(totalRecords / limit), readings
+    success: true,
+
+    patient: {
+      patientId: patient.patientId,
+      name: patient.patientName,
+      age: patient.age,
+      sex: patient.sex,
+      date: patient.date,
+      isActive: patient.isActive,
+      tabletId: tablet?.tabletId ?? null,
+      deviceStatus:
+        tablet?.lastSeenAt &&
+        Date.now() - new Date(tablet.lastSeenAt).getTime() <=
+          Number(process.env.DEVICE_ONLINE_TIMEOUT_SECONDS || 120) * 1000
+          ? "online"
+          : "offline"
+    },
+
+    page,
+    limit,
+    totalRecords,
+    totalPages: Math.ceil(totalRecords / limit),
+    readings
   });
 });
+
+
+
+
 
 export const activePatients = asyncHandler(async (req, res) => {
   const patients = await Patient.find({ isActive: true })
