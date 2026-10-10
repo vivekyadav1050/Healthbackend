@@ -32,6 +32,10 @@ export const createUser = asyncHandler(async (req, res) => {
   });
 });
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 80cdcdfd3adbb9c6e5688f005fb7fe2f989f77ba
 export const listUsers = asyncHandler(async (req, res) => {
   const users = await User.find().select("username role isActive createdAt updatedAt").sort({ createdAt: -1 });
   res.json({ success: true, count: users.length, users });
