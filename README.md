@@ -1,4 +1,4 @@
-# AP-20 Patient Monitoring Backend
+# Aerio Patient Monitoring Backend
 
 Node.js 20+, Express, MongoDB/Mongoose, JWT and JavaScript ES Modules.
 
