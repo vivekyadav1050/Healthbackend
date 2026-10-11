@@ -4,6 +4,8 @@ import Patient from "../models/Patient.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 
+
+
 export const assignPatient = asyncHandler(async (req, res) => {
   const { tabletId } = req.params;
   const { patientName, age, sex, date } = req.body;
@@ -45,7 +47,7 @@ export const assignPatient = asyncHandler(async (req, res) => {
     });
   }
 
-  // 2. Find the latest registered tablet belonging to this user
+  // 2. Find the latest active tablet belonging to this user
   const tablet = await Tablet.findOne({
     user: req.user.id,
     isActive: true,
@@ -58,7 +60,7 @@ export const assignPatient = asyncHandler(async (req, res) => {
     });
   }
 
-  // 3. Ensure the requested tabletId matches the latest registration
+  // 3. Verify the requested tablet ID
   if (tablet.tabletId !== tabletId) {
     return res.status(409).json({
       success: false,
@@ -67,24 +69,20 @@ export const assignPatient = asyncHandler(async (req, res) => {
     });
   }
 
-  // 4. Prevent assigning a second active patient to the same tablet
-  const existingPatient = await Patient.findOne({
-    tablet: tablet._id,
-    isActive: true,
-  });
-
-  if (existingPatient) {
-    return res.status(409).json({
-      success: false,
-      message: "Deactivate the current patient before assigning another",
-      currentPatient: {
-        patientId: existingPatient.patientId,
-        patientName: existingPatient.patientName,
+  // 4. Automatically deactivate previous active patients
+  await Patient.updateMany(
+    {
+      tablet: tablet._id,
+      isActive: true,
+    },
+    {
+      $set: {
+        isActive: false,
       },
-    });
-  }
+    }
+  );
 
-  // 5. Create patient using the latest tablet record
+  // 5. Assign the new patient
   const patient = await Patient.create({
     patientName: patientName.trim(),
     age,
@@ -97,10 +95,51 @@ export const assignPatient = asyncHandler(async (req, res) => {
 
   return res.status(201).json({
     success: true,
-    message: "Patient assigned successfully",
+    message: "Previous patient deactivated and new patient assigned successfully",
     patient,
   });
 });
+
+// export const setPatientStatus = asyncHandler(async (req, res) => {
+//   const { patientId } = req.params;
+
+//   if (typeof req.body.isActive !== "boolean") {
+//     return res.status(400).json({
+//       success: false,
+//       message: "isActive must be true or false",
+//     });
+//   }
+
+//   const patient = await Patient.findOne({ patientId });
+
+//   if (!patient) {
+//     return res.status(404).json({
+//       success: false,
+//       message: "Patient not found",
+//     });
+//   }
+
+//   const tablet = await Tablet.findOne({
+//     _id: patient.tablet,
+//     user: req.user.id,
+//   });
+
+//   if (!tablet) {
+//     return res.status(403).json({
+//       success: false,
+//       message: "You do not own this patient",
+//     });
+//   }
+
+//   patient.isActive = req.body.isActive;
+//   await patient.save();
+
+//   return res.json({
+//     success: true,
+//     message: "Patient status updated",
+//     patient,
+//   });
+// });
 
 
 export const setPatientStatus = asyncHandler(async (req, res) => {
